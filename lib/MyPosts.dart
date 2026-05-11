@@ -1,15 +1,14 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:flutter/material.dart';
 import 'PostDetails.dart';
 
-class DormList extends StatelessWidget {
-  const DormList({super.key});
+class MyPosts extends StatelessWidget {
+  const MyPosts({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -17,20 +16,19 @@ class DormList extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF5F5F5),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
         title: const Text(
-          "Dorm Essentials",
+          "My Posts",
           style: TextStyle(color: Colors.black),
         ),
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
 
-      body: StreamBuilder<QuerySnapshot>(
+      body: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('posts')
-            .where('category', isEqualTo: 'Dorm Essentials')
+            .where('sellerEmail', isEqualTo: user?.email)
             .snapshots(),
         builder: (context, snapshot) {
-
           if (!snapshot.hasData) {
             return const Center(
               child: CircularProgressIndicator(),
@@ -42,7 +40,7 @@ class DormList extends StatelessWidget {
           if (posts.isEmpty) {
             return const Center(
               child: Text(
-                "No items yet",
+                "No posts yet",
                 style: TextStyle(fontSize: 18),
               ),
             );
@@ -52,15 +50,10 @@ class DormList extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             itemCount: posts.length,
             itemBuilder: (context, index) {
-
               final data = posts[index];
 
               return GestureDetector(
                 onTap: () {
-
-                  final isOwner =
-                      currentUser?.email == data['sellerEmail'];
-
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -70,59 +63,42 @@ class DormList extends StatelessWidget {
                         description: data['description'],
                         price: data['price'],
                         sellerEmail: data['sellerEmail'],
-                        isOwner: isOwner,
+                        isOwner: true,
                       ),
                     ),
                   );
                 },
-
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 18),
+                  margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(14),
-
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-
                   child: Row(
                     children: [
-
                       Container(
-                        width: 110,
-                        height: 110,
+                        width: 90,
+                        height: 90,
                         decoration: BoxDecoration(
                           color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(
                           Icons.image,
-                          size: 50,
+                          size: 40,
                         ),
                       ),
 
-                      const SizedBox(width: 18),
+                      const SizedBox(width: 16),
 
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             Text(
                               data['title'],
                               style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            Text(
-                              "RM ${data['price']}",
-                              style: const TextStyle(
-                                color: Color(0xFF800020),
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -131,9 +107,11 @@ class DormList extends StatelessWidget {
                             const SizedBox(height: 8),
 
                             Text(
-                              data['type'],
-                              style: TextStyle(
-                                color: Colors.grey[700],
+                              "RM ${data['price']}",
+                              style: const TextStyle(
+                                color: Color(0xFF800020),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],

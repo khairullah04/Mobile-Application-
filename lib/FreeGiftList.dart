@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'PostDetails.dart';
 
-class DormList extends StatelessWidget {
-  const DormList({super.key});
+class FreeGiftList extends StatelessWidget {
+  const FreeGiftList({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +19,7 @@ class DormList extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         title: const Text(
-          "Dorm Essentials",
+          "Free / Gift",
           style: TextStyle(color: Colors.black),
         ),
       ),
@@ -27,7 +27,7 @@ class DormList extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('posts')
-            .where('category', isEqualTo: 'Dorm Essentials')
+            .where('category', isEqualTo: 'Free / Gift')
             .snapshots(),
         builder: (context, snapshot) {
 

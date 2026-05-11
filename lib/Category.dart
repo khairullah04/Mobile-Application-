@@ -3,6 +3,11 @@ import 'Login.dart';
 import 'Profile.dart';
 import 'DormList.dart';
 import 'Wishlist.dart';
+import 'AcademicList.dart';
+import 'ElectronicsList.dart';
+import 'LifestyleList.dart';
+import 'MerchList.dart';
+import 'FreeGiftList.dart';
 
 class Category extends StatelessWidget {
   const Category({super.key});
@@ -19,7 +24,7 @@ class Category extends StatelessWidget {
             children: [
               const SizedBox(height: 10),
 
-              
+              // TOP BAR
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -30,7 +35,8 @@ class Category extends StatelessWidget {
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const Login()),
+                            builder: (context) => const Login(),
+                          ),
                           (route) => false,
                         );
                       } else if (value == 'profile') {
@@ -53,13 +59,14 @@ class Category extends StatelessWidget {
                       ),
                     ],
                   ),
+
                   const Icon(Icons.chat_bubble_outline, size: 28),
                 ],
               ),
 
               const SizedBox(height: 15),
 
-              
+              // FILTER BAR
               Container(
                 height: 45,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -81,7 +88,7 @@ class Category extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              
+              // CATEGORY GRID
               Expanded(
                 child: GridView.count(
                   crossAxisCount: 3,
@@ -89,16 +96,40 @@ class Category extends StatelessWidget {
                   crossAxisSpacing: 10,
                   childAspectRatio: 0.75,
                   children: [
-                    const CategoryItem(
-                      image: 'assets/images/academic.jpg',
-                      title: 'Academic &\nTechnical',
-                    ),
-                    const CategoryItem(
-                      image: 'assets/images/gadget.jpg',
-                      title: 'Electronics &\nGadgets',
+
+                    // ACADEMIC
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AcademicList(),
+                          ),
+                        );
+                      },
+                      child: const CategoryItem(
+                        image: 'assets/images/academic.jpg',
+                        title: 'Academic &\nTechnical',
+                      ),
                     ),
 
-                    
+                    // ELECTRONICS
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ElectronicsList(),
+                          ),
+                        );
+                      },
+                      child: const CategoryItem(
+                        image: 'assets/images/gadget.jpg',
+                        title: 'Electronics &\nGadgets',
+                      ),
+                    ),
+
+                    // DORM
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -114,17 +145,52 @@ class Category extends StatelessWidget {
                       ),
                     ),
 
-                    const CategoryItem(
-                      image: 'assets/images/lifestyle.jpg',
-                      title: 'Lifestyle &\nCampus Life',
+                    // LIFESTYLE
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LifestyleList(),
+                          ),
+                        );
+                      },
+                      child: const CategoryItem(
+                        image: 'assets/images/lifestyle.jpg',
+                        title: 'Lifestyle &\nCampus Life',
+                      ),
                     ),
-                    const CategoryItem(
-                      image: 'assets/images/merch.jpg',
-                      title: 'UTM\nMerchandise',
+
+                    // MERCH
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MerchList(),
+                          ),
+                        );
+                      },
+                      child: const CategoryItem(
+                        image: 'assets/images/merch.jpg',
+                        title: 'UTM\nMerchandise',
+                      ),
                     ),
-                    const CategoryItem(
-                      image: 'assets/images/free.jpg',
-                      title: 'Free / Gift\n"Pass It On"',
+
+                    // FREE GIFT
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FreeGiftList(),
+                          ),
+                        );
+                      },
+                      child: const CategoryItem(
+                        image: 'assets/images/free.jpg',
+                        title: 'Free / Gift\n"Pass It On"',
+                      ),
                     ),
                   ],
                 ),
@@ -134,7 +200,7 @@ class Category extends StatelessWidget {
         ),
       ),
 
-      
+      // BOTTOM NAVIGATION BAR
       bottomNavigationBar: Container(
         height: 70,
         decoration: const BoxDecoration(
@@ -147,28 +213,60 @@ class Category extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            const Icon(Icons.home, color: Colors.white, size: 30),
 
-            
+            // HOME
             IconButton(
-              icon: const Icon(Icons.favorite_border,
-                  color: Colors.white70, size: 28),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const Wishlist(),
-                  ),
-                );
-              },
+              onPressed: () {},
+              icon: const Icon(
+                Icons.home,
+                color: Colors.white,
+                size: 30,
+              ),
             ),
 
-            const Icon(Icons.add_circle_outline,
-                color: Colors.white70, size: 32),
-            const Icon(Icons.notifications_none,
-                color: Colors.white70, size: 28),
-            const Icon(Icons.chat_bubble_outline,
-                color: Colors.white70, size: 28),
+            // WISHLIST
+            IconButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/wishlist');
+              },
+              icon: const Icon(
+                Icons.favorite_border,
+                color: Colors.white70,
+                size: 28,
+              ),
+            ),
+
+            // CREATE POST
+            IconButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/createpost');
+              },
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.white70,
+                size: 32,
+              ),
+            ),
+
+            // NOTIFICATION
+            IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.notifications_none,
+                color: Colors.white70,
+                size: 28,
+              ),
+            ),
+
+            // CHAT
+            IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.chat_bubble_outline,
+                color: Colors.white70,
+                size: 28,
+              ),
+            ),
           ],
         ),
       ),
@@ -176,7 +274,7 @@ class Category extends StatelessWidget {
   }
 }
 
-// 📦 CATEGORY ITEM WIDGET
+// CATEGORY ITEM WIDGET
 class CategoryItem extends StatelessWidget {
   final String image;
   final String title;
@@ -201,7 +299,9 @@ class CategoryItem extends StatelessWidget {
             fit: BoxFit.cover,
           ),
         ),
+
         const SizedBox(height: 5),
+
         Text(
           title,
           style: const TextStyle(fontSize: 12),

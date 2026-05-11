@@ -1,23 +1,60 @@
 import 'package:flutter/material.dart';
-import 'Category.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'Category.dart';
 import 'main.dart';
 
-class Login extends StatelessWidget {
+class Login extends StatefulWidget {
   const Login({super.key});
+
+  @override
+  State<Login> createState() => _LoginState();
+}
+
+class _LoginState extends State<Login> {
+
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  bool isLoading = false;
+
+  Future<void> login() async {
+    setState(() => isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Category()),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login failed")),
+      );
+    }
+
+    setState(() => isLoading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
+
       body: SafeArea(
-        child: SingleChildScrollView( 
+        child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+
                 const SizedBox(height: 10),
 
+                // 🔙 BACK
                 Row(
                   children: [
                     IconButton(
@@ -25,9 +62,7 @@ class Login extends StatelessWidget {
                       onPressed: () {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) => HomePage(),
-                          ),
+                          MaterialPageRoute(builder: (_) => HomePage()),
                           (route) => false,
                         );
                       },
@@ -37,145 +72,72 @@ class Login extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
+                // 🔥 LOGO
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Flexible( 
+                    Flexible(
                       child: Text.rich(
                         TextSpan(
                           style: const TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              fontSize: 40,
+                              fontWeight: FontWeight.bold),
                           children: const [
                             TextSpan(
                               text: 'Uni',
-                              style: TextStyle(color: Color.fromARGB(255, 132, 10, 2)),
+                              style: TextStyle(
+                                  color: Color.fromARGB(255, 132, 10, 2)),
                             ),
                             TextSpan(
                               text: 'Sell',
-                              style: TextStyle(color: Color.fromARGB(255, 232, 160, 0)),
+                              style: TextStyle(
+                                  color: Color.fromARGB(255, 232, 160, 0)),
                             ),
                           ],
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text(
-                      "x",
-                      style: TextStyle(fontSize: 18),
-                    ),
+                    const Text("x"),
                     const SizedBox(width: 6),
-                    Image.asset(
-                      'assets/images/utmlogo.png', 
-                      height: 35,
-                    ),
+                    Image.asset('assets/images/utmlogo.png', height: 35),
                   ],
                 ),
 
                 const SizedBox(height: 40),
 
-                const Text(
-                  "Welcome",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  "to Campus MarketPlace",
-                  style: TextStyle(fontSize: 18),
-                ),
+                const Text("Welcome",
+                    style:
+                        TextStyle(fontSize: 28, fontWeight: FontWeight.w500)),
+
+                const Text("to Campus MarketPlace"),
 
                 const SizedBox(height: 40),
 
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text("Email", style: TextStyle(fontSize: 14)),
-                ),
-                const SizedBox(height: 8),
+                // EMAIL
+                _buildField(emailController, "Email", Icons.email),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.email_outlined),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: "Login with UTMid",
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text("Password", style: TextStyle(fontSize: 14)),
-                ),
-                const SizedBox(height: 8),
-
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.visibility_outlined),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            hintText: "Enter your Password",
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // PASSWORD
+                _buildField(passwordController, "Password", Icons.lock, true),
 
                 const SizedBox(height: 40),
 
-                
+                // 🔐 LOGIN BUTTON
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const Category(),
-                        ),
-                      );
-                    },
+                    onPressed: isLoading ? null : login,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF800020),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
-                      elevation: 5,
                     ),
-                    child: const Text(
-                      "Log In",
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Log In",
+                            style: TextStyle(color: Colors.white)),
                   ),
                 ),
 
@@ -184,6 +146,34 @@ class Login extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String hint,
+      IconData icon, [bool isPassword = false]) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              obscureText: isPassword,
+              decoration: InputDecoration(
+                hintText: hint,
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

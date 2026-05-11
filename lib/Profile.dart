@@ -1,130 +1,205 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Login.dart';
+import 'MyPosts.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
 
-              
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () {
-                      Navigator.pop(context); 
-                    },
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F5F5),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+        title: const Text(
+          "Profile",
+          style: TextStyle(color: Colors.black),
+        ),
+      ),
+
+      body: FutureBuilder<DocumentSnapshot>(
+        future: FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .get(),
+
+        builder: (context, snapshot) {
+
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final data =
+              snapshot.data!.data() as Map<String, dynamic>;
+
+          final name = data['name'] ?? "User";
+          final email = data['email'] ?? "";
+
+          return Padding(
+            padding: const EdgeInsets.all(20),
+
+            child: Column(
+              children: [
+
+                const SizedBox(height: 20),
+
+                CircleAvatar(
+                  radius: 55,
+                  backgroundColor: Colors.grey[300],
+                  child: const Icon(
+                    Icons.person,
+                    size: 60,
+                    color: Colors.white,
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.person, size: 28),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  const CircleAvatar(
-                    radius: 60,
-                    backgroundImage:
-                        AssetImage('assets/images/khaiprofile.jpg'),
-                  ),
-                  const CircleAvatar(
-                    radius: 14,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 16),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              
-              const Text(
-                "Khai",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
                 ),
-              ),
 
-              const SizedBox(height: 30),
+                const SizedBox(height: 20),
 
-              
-              _buildOption(Icons.person_outline, "Edit Profile"),
-              _buildOption(Icons.help_outline, "Help"),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 8),
 
-              _buildOption(Icons.edit_outlined, "My Posts"),
-              _buildOption(Icons.inventory_2_outlined, "My orders"),
+                Text(
+                  email,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 40),
 
-              _buildOption(Icons.security, "Security"),
+                profileButton(
+                  icon: Icons.shopping_bag_outlined,
+                  title: "My Orders",
+                  onTap: () {},
+                ),
 
-              const Spacer(),
-
-              
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
+                profileButton(
+                  icon: Icons.inventory_2_outlined,
+                  title: "My Posts",
+                  onTap: () {
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const Login(),
+                        builder: (_) => const MyPosts(),
                       ),
-                      (route) => false,
                     );
                   },
-                  icon: const Icon(Icons.power_settings_new),
-                  label: const Text("Log out", style: TextStyle(color: Colors.white),),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF800020),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                ),
+
+                profileButton(
+                  icon: Icons.edit_outlined,
+                  title: "Edit Profile",
+                  onTap: () {},
+                ),
+
+                const Spacer(),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+
+                  child: ElevatedButton(
+                    onPressed: () async {
+
+                      await FirebaseAuth.instance.signOut();
+
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const Login(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF800020),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+
+                    child: const Text(
+                      "Logout",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  // 🔧 Reusable option widget
-  Widget _buildOption(IconData icon, String text) {
+  Widget profileButton({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        children: [
-          Icon(icon),
-          const SizedBox(width: 12),
-          Expanded(child: Text(text)),
-          const Icon(Icons.arrow_forward_ios, size: 16),
-        ],
+      margin: const EdgeInsets.only(bottom: 18),
+
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 18,
+            ),
+
+            child: Row(
+              children: [
+
+                Icon(
+                  icon,
+                  size: 28,
+                ),
+
+                const SizedBox(width: 18),
+
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                const Spacer(),
+
+                const Icon(Icons.arrow_forward_ios, size: 18),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
