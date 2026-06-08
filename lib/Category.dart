@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'Login.dart';
 import 'Profile.dart';
 import 'DormList.dart';
-import 'Wishlist.dart';
 import 'AcademicList.dart';
 import 'ElectronicsList.dart';
 import 'LifestyleList.dart';
 import 'MerchList.dart';
 import 'FreeGiftList.dart';
+import 'ChatList.dart';
 
 class Category extends StatelessWidget {
   const Category({super.key});
@@ -60,7 +63,18 @@ class Category extends StatelessWidget {
                     ],
                   ),
 
-                  const Icon(Icons.chat_bubble_outline, size: 28),
+                  // TOP CHAT ICON WITH RED DOT
+                  UnreadChatIcon(
+                    iconColor: Colors.black,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ChatList(),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
 
@@ -96,8 +110,6 @@ class Category extends StatelessWidget {
                   crossAxisSpacing: 10,
                   childAspectRatio: 0.75,
                   children: [
-
-                    // ACADEMIC
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -113,7 +125,6 @@ class Category extends StatelessWidget {
                       ),
                     ),
 
-                    // ELECTRONICS
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -129,7 +140,6 @@ class Category extends StatelessWidget {
                       ),
                     ),
 
-                    // DORM
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -145,7 +155,6 @@ class Category extends StatelessWidget {
                       ),
                     ),
 
-                    // LIFESTYLE
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -161,7 +170,6 @@ class Category extends StatelessWidget {
                       ),
                     ),
 
-                    // MERCH
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -177,7 +185,6 @@ class Category extends StatelessWidget {
                       ),
                     ),
 
-                    // FREE GIFT
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -213,7 +220,6 @@ class Category extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-
             // HOME
             IconButton(
               onPressed: () {},
@@ -258,14 +264,17 @@ class Category extends StatelessWidget {
               ),
             ),
 
-            // CHAT
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.chat_bubble_outline,
-                color: Colors.white70,
-                size: 28,
-              ),
+            // BOTTOM CHAT ICON WITH RED DOT
+            UnreadChatIcon(
+              iconColor: Colors.white70,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChatList(),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -307,6 +316,96 @@ class CategoryItem extends StatelessWidget {
           style: const TextStyle(fontSize: 12),
         ),
       ],
+    );
+  }
+}
+
+// REUSABLE CHAT ICON WITH RED DOT
+class UnreadChatIcon extends StatelessWidget {
+  final Color iconColor;
+  final VoidCallback onPressed;
+
+  const UnreadChatIcon({
+    super.key,
+    required this.iconColor,
+    required this.onPressed,
+  });
+
+  String safeEmailKey(String email) {
+    return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null || user.email == null) {
+      return IconButton(
+        onPressed: onPressed,
+        icon: Icon(
+          Icons.chat_bubble_outline,
+          color: iconColor,
+          size: 28,
+        ),
+      );
+    }
+
+    final currentUserKey = safeEmailKey(user.email!);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .where('users', arrayContains: user.email)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int totalUnread = 0;
+
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+
+            final unreadCounts = Map<String, dynamic>.from(
+              data['unreadCounts'] ?? {},
+            );
+
+            final countRaw = unreadCounts[currentUserKey] ?? 0;
+
+            final int count = countRaw is int
+                ? countRaw
+                : int.tryParse(countRaw.toString()) ?? 0;
+
+            totalUnread += count;
+          }
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              onPressed: onPressed,
+              icon: Icon(
+                Icons.chat_bubble_outline,
+                color: iconColor,
+                size: 28,
+              ),
+            ),
+
+            if (totalUnread > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

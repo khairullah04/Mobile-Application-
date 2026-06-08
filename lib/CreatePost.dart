@@ -41,15 +41,37 @@ class _CreatePostState extends State<CreatePost> {
 
     if (user == null) return;
 
+    if (titleController.text.trim().isEmpty ||
+        descController.text.trim().isEmpty ||
+        priceController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in all fields before publishing."),
+        ),
+      );
+      return;
+    }
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final sellerName = userDoc['name'] ?? 'Seller';
+
     await FirebaseFirestore.instance.collection('posts').add({
-      'title': titleController.text,
-      'description': descController.text,
-      'price': priceController.text,
+      'title': titleController.text.trim(),
+      'description': descController.text.trim(),
+      'price': priceController.text.trim(),
       'category': selectedCategory,
       'type': selectedType,
       'sellerEmail': user.email,
+      'sellerName': sellerName,
+      'status': 'Available',
       'createdAt': Timestamp.now(),
     });
+
+    if (!mounted) return;
 
     Navigator.pop(context);
   }
@@ -78,10 +100,17 @@ class _CreatePostState extends State<CreatePost> {
   }
 
   @override
+  void dispose() {
+    titleController.dispose();
+    descController.dispose();
+    priceController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -286,6 +315,7 @@ class _CreatePostState extends State<CreatePost> {
 
                     TextField(
                       controller: priceController,
+                      keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.grey[300],
