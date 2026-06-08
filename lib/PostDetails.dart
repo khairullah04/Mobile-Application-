@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import 'ChatRoom.dart';
+import 'SellerProfile.dart';
 
 class PostDetails extends StatefulWidget {
   final String postId;
@@ -30,6 +32,7 @@ class PostDetails extends StatefulWidget {
 class _PostDetailsState extends State<PostDetails> {
   bool isFavorite = false;
   String postStatus = "Available";
+  String sellerUid = "";
 
   String safeEmailKey(String email) {
     return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
@@ -39,10 +42,10 @@ class _PostDetailsState extends State<PostDetails> {
   void initState() {
     super.initState();
     checkWishlist();
-    loadPostStatus();
+    loadPostData();
   }
 
-  Future<void> loadPostStatus() async {
+  Future<void> loadPostData() async {
     final doc = await FirebaseFirestore.instance
         .collection('posts')
         .doc(widget.postId)
@@ -55,6 +58,7 @@ class _PostDetailsState extends State<PostDetails> {
 
       setState(() {
         postStatus = data?['status'] ?? 'Available';
+        sellerUid = data?['sellerUid'] ?? '';
       });
     }
   }
@@ -92,6 +96,8 @@ class _PostDetailsState extends State<PostDetails> {
     if (isFavorite) {
       await ref.delete();
 
+      if (!mounted) return;
+
       setState(() {
         isFavorite = false;
       });
@@ -103,9 +109,12 @@ class _PostDetailsState extends State<PostDetails> {
         'price': widget.price,
         'sellerEmail': widget.sellerEmail,
         'sellerName': widget.sellerName,
+        'sellerUid': sellerUid,
         'status': postStatus,
         'timestamp': Timestamp.now(),
       });
+
+      if (!mounted) return;
 
       setState(() {
         isFavorite = true;
@@ -207,6 +216,10 @@ class _PostDetailsState extends State<PostDetails> {
           currentUserEmail: currentUserName,
           sellerEmail: widget.sellerName,
         },
+        'userUids': {
+          currentUserEmail: currentUser.uid,
+          sellerEmail: sellerUid,
+        },
         'unreadCounts': {
           currentUserKey: 0,
           sellerKey: 0,
@@ -227,6 +240,15 @@ class _PostDetailsState extends State<PostDetails> {
           },
         });
       }
+
+      if (data != null && !data.containsKey('userUids')) {
+        await chatRef.update({
+          'userUids': {
+            currentUserEmail: currentUser.uid,
+            sellerEmail: sellerUid,
+          },
+        });
+      }
     }
 
     if (!mounted) return;
@@ -238,6 +260,30 @@ class _PostDetailsState extends State<PostDetails> {
           chatRoomId: chatRoomId,
           otherUserEmail: widget.sellerEmail,
           otherUserName: widget.sellerName,
+        ),
+      ),
+    );
+  }
+
+  void openSellerProfile() {
+    if (sellerUid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Seller profile is only available for newer posts.",
+          ),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SellerProfile(
+          sellerUid: sellerUid,
+          sellerName: widget.sellerName,
+          sellerEmail: widget.sellerEmail,
         ),
       ),
     );
@@ -258,6 +304,35 @@ class _PostDetailsState extends State<PostDetails> {
           color: Colors.white,
           fontWeight: FontWeight.bold,
           fontSize: 13,
+        ),
+      ),
+    );
+  }
+
+  Widget sellerProfileRow() {
+    return InkWell(
+      onTap: openSellerProfile,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Seller: ${widget.sellerName}",
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[800],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 5),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 13,
+              color: Color(0xFF800020),
+            ),
+          ],
         ),
       ),
     );
@@ -339,13 +414,7 @@ class _PostDetailsState extends State<PostDetails> {
 
                     const SizedBox(height: 10),
 
-                    Text(
-                      "Seller: ${widget.sellerName}",
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[700],
-                      ),
-                    ),
+                    sellerProfileRow(),
 
                     const SizedBox(height: 20),
 
@@ -391,9 +460,8 @@ class _PostDetailsState extends State<PostDetails> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   ElevatedButton(
-                                    onPressed: isSold
-                                        ? markAsAvailable
-                                        : markAsSold,
+                                    onPressed:
+                                        isSold ? markAsAvailable : markAsSold,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: isSold
                                           ? Colors.green

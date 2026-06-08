@@ -65,6 +65,7 @@ class _CreatePostState extends State<CreatePost> {
       'price': priceController.text.trim(),
       'category': selectedCategory,
       'type': selectedType,
+      'sellerUid': user.uid,
       'sellerEmail': user.email,
       'sellerName': sellerName,
       'status': 'Available',
