@@ -78,6 +78,20 @@ class Category extends StatelessWidget {
                 ],
               ),
 
+              const SizedBox(height: 10),
+
+              // TOP CHAT NOTIFICATION BANNER
+              ChatNotificationBanner(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatList(),
+                    ),
+                  );
+                },
+              ),
+
               const SizedBox(height: 15),
 
               // FILTER BAR
@@ -217,6 +231,7 @@ class Category extends StatelessWidget {
             topRight: Radius.circular(20),
           ),
         ),
+
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -254,14 +269,17 @@ class Category extends StatelessWidget {
               ),
             ),
 
-            // NOTIFICATION
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.notifications_none,
-                color: Colors.white70,
-                size: 28,
-              ),
+            // NOTIFICATION BELL WITH RED DOT
+            UnreadBellIcon(
+              iconColor: Colors.white70,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChatList(),
+                  ),
+                );
+              },
             ),
 
             // BOTTOM CHAT ICON WITH RED DOT
@@ -320,6 +338,110 @@ class CategoryItem extends StatelessWidget {
   }
 }
 
+// SAFE EMAIL KEY
+String safeEmailKey(String email) {
+  return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
+}
+
+// TOP CHAT NOTIFICATION BANNER
+class ChatNotificationBanner extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const ChatNotificationBanner({
+    super.key,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null || user.email == null) {
+      return const SizedBox.shrink();
+    }
+
+    final currentUserKey = safeEmailKey(user.email!);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .where('users', arrayContains: user.email)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int totalUnread = 0;
+
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+
+            final unreadCounts = Map<String, dynamic>.from(
+              data['unreadCounts'] ?? {},
+            );
+
+            final countRaw = unreadCounts[currentUserKey] ?? 0;
+
+            final int count = countRaw is int
+                ? countRaw
+                : int.tryParse(countRaw.toString()) ?? 0;
+
+            totalUnread += count;
+          }
+        }
+
+        if (totalUnread == 0) {
+          return const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF800020),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.notifications_active,
+                  color: Colors.white,
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: Text(
+                    totalUnread == 1
+                        ? "You have 1 new message"
+                        : "You have $totalUnread new messages",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                const Text(
+                  "Open",
+                  style: TextStyle(
+                    color: Colors.white,
+                    decoration: TextDecoration.underline,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 // REUSABLE CHAT ICON WITH RED DOT
 class UnreadChatIcon extends StatelessWidget {
   final Color iconColor;
@@ -330,10 +452,6 @@ class UnreadChatIcon extends StatelessWidget {
     required this.iconColor,
     required this.onPressed,
   });
-
-  String safeEmailKey(String email) {
-    return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -385,6 +503,92 @@ class UnreadChatIcon extends StatelessWidget {
               onPressed: onPressed,
               icon: Icon(
                 Icons.chat_bubble_outline,
+                color: iconColor,
+                size: 28,
+              ),
+            ),
+
+            if (totalUnread > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// REUSABLE NOTIFICATION BELL WITH RED DOT
+class UnreadBellIcon extends StatelessWidget {
+  final Color iconColor;
+  final VoidCallback onPressed;
+
+  const UnreadBellIcon({
+    super.key,
+    required this.iconColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null || user.email == null) {
+      return IconButton(
+        onPressed: onPressed,
+        icon: Icon(
+          Icons.notifications_none,
+          color: iconColor,
+          size: 28,
+        ),
+      );
+    }
+
+    final currentUserKey = safeEmailKey(user.email!);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .where('users', arrayContains: user.email)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int totalUnread = 0;
+
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+
+            final unreadCounts = Map<String, dynamic>.from(
+              data['unreadCounts'] ?? {},
+            );
+
+            final countRaw = unreadCounts[currentUserKey] ?? 0;
+
+            final int count = countRaw is int
+                ? countRaw
+                : int.tryParse(countRaw.toString()) ?? 0;
+
+            totalUnread += count;
+          }
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              onPressed: onPressed,
+              icon: Icon(
+                Icons.notifications_none,
                 color: iconColor,
                 size: 28,
               ),

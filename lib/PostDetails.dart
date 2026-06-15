@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ChatRoom.dart';
 import 'SellerProfile.dart';
+import 'EditPost.dart';
 
 class PostDetails extends StatefulWidget {
   final String postId;
@@ -31,6 +32,10 @@ class PostDetails extends StatefulWidget {
 
 class _PostDetailsState extends State<PostDetails> {
   bool isFavorite = false;
+
+  String postTitle = "";
+  String postDescription = "";
+  String postPrice = "";
   String postStatus = "Available";
   String sellerUid = "";
 
@@ -41,6 +46,11 @@ class _PostDetailsState extends State<PostDetails> {
   @override
   void initState() {
     super.initState();
+
+    postTitle = widget.title;
+    postDescription = widget.description;
+    postPrice = widget.price;
+
     checkWishlist();
     loadPostData();
   }
@@ -57,6 +67,9 @@ class _PostDetailsState extends State<PostDetails> {
       final data = doc.data();
 
       setState(() {
+        postTitle = data?['title'] ?? widget.title;
+        postDescription = data?['description'] ?? widget.description;
+        postPrice = data?['price'] ?? widget.price;
         postStatus = data?['status'] ?? 'Available';
         sellerUid = data?['sellerUid'] ?? '';
       });
@@ -104,9 +117,9 @@ class _PostDetailsState extends State<PostDetails> {
     } else {
       await ref.set({
         'postId': widget.postId,
-        'title': widget.title,
-        'description': widget.description,
-        'price': widget.price,
+        'title': postTitle,
+        'description': postDescription,
+        'price': postPrice,
         'sellerEmail': widget.sellerEmail,
         'sellerName': widget.sellerName,
         'sellerUid': sellerUid,
@@ -164,6 +177,41 @@ class _PostDetailsState extends State<PostDetails> {
     );
   }
 
+  Future<void> confirmDeletePost() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete Post"),
+          content: const Text(
+            "Are you sure you want to delete this post? This action cannot be undone.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await deletePost();
+    }
+  }
+
   Future<void> deletePost() async {
     await FirebaseFirestore.instance
         .collection('posts')
@@ -173,6 +221,21 @@ class _PostDetailsState extends State<PostDetails> {
     if (!mounted) return;
 
     Navigator.pop(context);
+  }
+
+  Future<void> openEditPost() async {
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditPost(
+          postId: widget.postId,
+        ),
+      ),
+    );
+
+    if (updated == true) {
+      loadPostData();
+    }
   }
 
   Future<void> openChatWithSeller() async {
@@ -251,6 +314,26 @@ class _PostDetailsState extends State<PostDetails> {
       }
     }
 
+    final itemMessage =
+        "I'm interested in this item:\n$postTitle\nRM $postPrice";
+
+    await chatRef.collection('messages').add({
+      'senderEmail': currentUserEmail,
+      'message': itemMessage,
+      'type': 'item_reference',
+      'itemId': widget.postId,
+      'itemTitle': postTitle,
+      'itemPrice': postPrice,
+      'timestamp': Timestamp.now(),
+    });
+
+    await chatRef.update({
+      'lastMessage': itemMessage,
+      'lastMessageTime': Timestamp.now(),
+      'lastSenderEmail': currentUserEmail,
+      'unreadCounts.$sellerKey': FieldValue.increment(1),
+    });
+
     if (!mounted) return;
 
     Navigator.push(
@@ -306,6 +389,42 @@ class _PostDetailsState extends State<PostDetails> {
           fontSize: 13,
         ),
       ),
+    );
+  }
+
+  Widget sellerMenuButton() {
+    if (!widget.isOwner) {
+      return const SizedBox.shrink();
+    }
+
+    return PopupMenuButton<String>(
+      icon: const Icon(
+        Icons.more_vert,
+        color: Colors.black,
+      ),
+      onSelected: (value) {
+        if (value == 'delete') {
+          confirmDeletePost();
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete_outline,
+                color: Colors.red,
+              ),
+              SizedBox(width: 10),
+              Text(
+                "Delete Post",
+                style: TextStyle(color: Colors.red),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -373,9 +492,16 @@ class _PostDetailsState extends State<PostDetails> {
 
                   Positioned(
                     top: 18,
-                    right: 18,
+                    right: widget.isOwner ? 55 : 18,
                     child: statusBadge(),
                   ),
+
+                  if (widget.isOwner)
+                    Positioned(
+                      top: 8,
+                      right: 5,
+                      child: sellerMenuButton(),
+                    ),
                 ],
               ),
             ),
@@ -391,7 +517,7 @@ class _PostDetailsState extends State<PostDetails> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.title,
+                            postTitle,
                             style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
@@ -429,7 +555,7 @@ class _PostDetailsState extends State<PostDetails> {
                     const SizedBox(height: 10),
 
                     Text(
-                      widget.description,
+                      postDescription,
                       style: const TextStyle(
                         fontSize: 16,
                       ),
@@ -446,7 +572,7 @@ class _PostDetailsState extends State<PostDetails> {
                           children: [
                             const Text("Total Price"),
                             Text(
-                              "RM ${widget.price}",
+                              "RM $postPrice",
                               style: const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
@@ -460,12 +586,36 @@ class _PostDetailsState extends State<PostDetails> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   ElevatedButton(
+                                    onPressed: openEditPost,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          const Color(0xFF800020),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 35,
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "Edit Post",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 10),
+
+                                  ElevatedButton(
                                     onPressed:
                                         isSold ? markAsAvailable : markAsSold,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: isSold
                                           ? Colors.green
-                                          : const Color(0xFF800020),
+                                          : Colors.orange,
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 22,
                                         vertical: 14,
@@ -479,29 +629,6 @@ class _PostDetailsState extends State<PostDetails> {
                                           ? "Mark Available"
                                           : "Mark as Sold",
                                       style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 10),
-
-                                  ElevatedButton(
-                                    onPressed: deletePost,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 25,
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      "Delete Post",
-                                      style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
                                       ),

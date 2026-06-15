@@ -46,16 +46,24 @@ class _ChatRoomState extends State<ChatRoom> {
     });
   }
 
-  Future<void> sendMessage() async {
+  Future<void> sendMessage({
+    String? customMessage,
+    String messageType = "text",
+    String? itemId,
+    String? itemTitle,
+    String? itemPrice,
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null || user.email == null) return;
 
-    final text = messageController.text.trim();
+    final text = customMessage ?? messageController.text.trim();
 
     if (text.isEmpty) return;
 
-    messageController.clear();
+    if (customMessage == null) {
+      messageController.clear();
+    }
 
     final chatRef =
         FirebaseFirestore.instance.collection('chats').doc(widget.chatRoomId);
@@ -78,6 +86,10 @@ class _ChatRoomState extends State<ChatRoom> {
     await chatRef.collection('messages').add({
       'senderEmail': user.email,
       'message': text,
+      'type': messageType,
+      'itemId': itemId,
+      'itemTitle': itemTitle,
+      'itemPrice': itemPrice,
       'timestamp': Timestamp.now(),
     });
 
@@ -87,6 +99,245 @@ class _ChatRoomState extends State<ChatRoom> {
       'lastSenderEmail': user.email,
       'unreadCounts.$receiverKey': FieldValue.increment(1),
     });
+  }
+
+  Future<void> openItemSelector() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFFF5F5F5),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(25),
+        ),
+      ),
+      builder: (context) {
+        return SizedBox(
+          height: 420,
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+
+              Container(
+                width: 45,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              Text(
+                "${widget.otherUserName}'s Listed Items",
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Expanded(
+                child: FutureBuilder<QuerySnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('posts')
+                      .where('sellerEmail', isEqualTo: widget.otherUserEmail)
+                      .get(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                        child: Text("No listed items found."),
+                      );
+                    }
+
+                    final posts = snapshot.data!.docs;
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        final post = posts[index];
+                        final data = post.data() as Map<String, dynamic>;
+
+                        final title = data['title'] ?? "Untitled Item";
+                        final price = data['price'] ?? "0";
+                        final status = data['status'] ?? "Available";
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.grey[300],
+                              child: const Icon(
+                                Icons.image,
+                                color: Colors.white,
+                              ),
+                            ),
+                            title: Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text("RM $price • $status"),
+                            trailing: const Icon(
+                              Icons.send,
+                              color: Color(0xFF800020),
+                            ),
+                            onTap: () async {
+                              Navigator.pop(context);
+
+                              final itemMessage =
+                                  "I'm interested in this item:\n$title\nRM $price";
+
+                              await sendMessage(
+                                customMessage: itemMessage,
+                                messageType: "item_reference",
+                                itemId: post.id,
+                                itemTitle: title,
+                                itemPrice: price,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget buildMessageBubble({
+    required bool isMe,
+    required Map<String, dynamic> msgData,
+  }) {
+    final message = msgData['message'] ?? "";
+    final type = msgData['type'] ?? "text";
+
+    if (type == "item_reference") {
+      final itemTitle = msgData['itemTitle'] ?? "Item";
+      final itemPrice = msgData['itemPrice'] ?? "";
+
+      return Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(12),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
+          ),
+          decoration: BoxDecoration(
+            color: isMe ? const Color(0xFF800020) : Colors.grey[300],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Item Reference",
+                style: TextStyle(
+                  color: isMe ? Colors.white70 : Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isMe ? Colors.white.withOpacity(0.15) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.shopping_bag_outlined,
+                      color: isMe ? Colors.white : const Color(0xFF800020),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            itemTitle,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 3),
+
+                          Text(
+                            "RM $itemPrice",
+                            style: TextStyle(
+                              color: isMe ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                message,
+                style: TextStyle(
+                  color: isMe ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.7,
+        ),
+        decoration: BoxDecoration(
+          color: isMe ? const Color(0xFF800020) : Colors.grey[300],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          message,
+          style: TextStyle(
+            color: isMe ? Colors.white : Colors.black,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -163,35 +414,11 @@ class _ChatRoomState extends State<ChatRoom> {
                     final msg = messages[index];
                     final msgData = msg.data() as Map<String, dynamic>;
 
-                    final isMe =
-                        msgData['senderEmail'] == currentUser?.email;
+                    final isMe = msgData['senderEmail'] == currentUser?.email;
 
-                    return Align(
-                      alignment:
-                          isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? const Color(0xFF800020)
-                              : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          msgData['message'] ?? "",
-                          style: TextStyle(
-                            color: isMe ? Colors.white : Colors.black,
-                          ),
-                        ),
-                      ),
+                    return buildMessageBubble(
+                      isMe: isMe,
+                      msgData: msgData,
                     );
                   },
                 );
@@ -204,6 +431,19 @@ class _ChatRoomState extends State<ChatRoom> {
             color: Colors.white,
             child: Row(
               children: [
+                CircleAvatar(
+                  backgroundColor: Colors.grey[300],
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.shopping_bag_outlined,
+                      color: Color(0xFF800020),
+                    ),
+                    onPressed: openItemSelector,
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
                 Expanded(
                   child: TextField(
                     controller: messageController,

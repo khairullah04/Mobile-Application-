@@ -12,6 +12,18 @@ class ChatList extends StatelessWidget {
     return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
   }
 
+  String getChatPreview(String lastMessage) {
+    if (lastMessage.trim().isEmpty) {
+      return "No messages yet";
+    }
+
+    if (lastMessage.startsWith("I'm interested in this item:")) {
+      return "🛍️ Item reference sent";
+    }
+
+    return lastMessage;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -22,6 +34,7 @@ class ChatList extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF800020),
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           "Chats",
           style: TextStyle(color: Colors.white),
@@ -67,7 +80,21 @@ class ChatList extends StatelessWidget {
                   );
                 }
 
-                final chats = snapshot.data!.docs;
+                final chats = snapshot.data!.docs.toList();
+
+                chats.sort((a, b) {
+                  final aData = a.data() as Map<String, dynamic>;
+                  final bData = b.data() as Map<String, dynamic>;
+
+                  final aTime = aData['lastMessageTime'];
+                  final bTime = bData['lastMessageTime'];
+
+                  if (aTime is Timestamp && bTime is Timestamp) {
+                    return bTime.compareTo(aTime);
+                  }
+
+                  return 0;
+                });
 
                 if (chats.isEmpty) {
                   return const Center(
@@ -99,6 +126,7 @@ class ChatList extends StatelessWidget {
                     final otherName = userNames[otherEmail] ?? otherEmail;
 
                     final lastMessage = chatData['lastMessage'] ?? "";
+                    final previewText = getChatPreview(lastMessage);
 
                     final unreadCounts = Map<String, dynamic>.from(
                       chatData['unreadCounts'] ?? {},
@@ -112,15 +140,19 @@ class ChatList extends StatelessWidget {
                         ? unreadCountRaw
                         : int.tryParse(unreadCountRaw.toString()) ?? 0;
 
+                    final bool hasUnread = unreadCount > 0;
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Color(0xFF800020),
-                          child: Icon(
+                        leading: CircleAvatar(
+                          backgroundColor: hasUnread
+                              ? const Color(0xFF800020)
+                              : Colors.grey[400],
+                          child: const Icon(
                             Icons.person,
                             color: Colors.white,
                           ),
@@ -129,24 +161,27 @@ class ChatList extends StatelessWidget {
                         title: Text(
                           otherName,
                           style: TextStyle(
-                            fontWeight: unreadCount > 0
+                            fontWeight: hasUnread
                                 ? FontWeight.bold
                                 : FontWeight.normal,
                           ),
                         ),
 
                         subtitle: Text(
-                          lastMessage == "" ? "No messages yet" : lastMessage,
+                          previewText,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontWeight: unreadCount > 0
+                            fontWeight: hasUnread
                                 ? FontWeight.bold
                                 : FontWeight.normal,
+                            color: previewText.contains("Item reference")
+                                ? const Color(0xFF800020)
+                                : Colors.grey[700],
                           ),
                         ),
 
-                        trailing: unreadCount > 0
+                        trailing: hasUnread
                             ? CircleAvatar(
                                 radius: 13,
                                 backgroundColor: Colors.red,
@@ -209,16 +244,26 @@ class ChatList extends StatelessWidget {
               },
             ),
 
-            const Icon(
-              Icons.favorite_border,
-              color: Colors.white70,
-              size: 28,
+            IconButton(
+              icon: const Icon(
+                Icons.favorite_border,
+                color: Colors.white70,
+                size: 28,
+              ),
+              onPressed: () {
+                Navigator.pushNamed(context, '/wishlist');
+              },
             ),
 
-            const Icon(
-              Icons.add_circle_outline,
-              color: Colors.white70,
-              size: 32,
+            IconButton(
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.white70,
+                size: 32,
+              ),
+              onPressed: () {
+                Navigator.pushNamed(context, '/createpost');
+              },
             ),
 
             const Icon(

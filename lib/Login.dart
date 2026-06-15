@@ -11,13 +11,22 @@ class Login extends StatefulWidget {
 }
 
 class _LoginState extends State<Login> {
-
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
   bool isLoading = false;
 
   Future<void> login() async {
+    if (emailController.text.trim().isEmpty ||
+        passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your email and password."),
+        ),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
@@ -26,18 +35,65 @@ class _LoginState extends State<Login> {
         password: passwordController.text.trim(),
       );
 
+      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const Category()),
       );
-
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login failed")),
+        const SnackBar(
+          content: Text("Login failed. Please check your email and password."),
+        ),
       );
     }
 
+    if (!mounted) return;
+
     setState(() => isLoading = false);
+  }
+
+  Future<void> forgotPassword() async {
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your email first."),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Password reset link has been sent to your email."),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to send reset email. Please check your email."),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -51,10 +107,9 @@ class _LoginState extends State<Login> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-
                 const SizedBox(height: 10),
 
-                // 🔙 BACK
+                // BACK
                 Row(
                   children: [
                     IconButton(
@@ -72,7 +127,7 @@ class _LoginState extends State<Login> {
 
                 const SizedBox(height: 10),
 
-                // 🔥 LOGO
+                // LOGO
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -80,18 +135,21 @@ class _LoginState extends State<Login> {
                       child: Text.rich(
                         TextSpan(
                           style: const TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold),
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                          ),
                           children: const [
                             TextSpan(
                               text: 'Uni',
                               style: TextStyle(
-                                  color: Color.fromARGB(255, 132, 10, 2)),
+                                color: Color.fromARGB(255, 132, 10, 2),
+                              ),
                             ),
                             TextSpan(
                               text: 'Sell',
                               style: TextStyle(
-                                  color: Color.fromARGB(255, 232, 160, 0)),
+                                color: Color.fromARGB(255, 232, 160, 0),
+                              ),
                             ),
                           ],
                         ),
@@ -100,29 +158,61 @@ class _LoginState extends State<Login> {
                     const SizedBox(width: 6),
                     const Text("x"),
                     const SizedBox(width: 6),
-                    Image.asset('assets/images/utmlogo.png', height: 35),
+                    Image.asset(
+                      'assets/images/utmlogo.png',
+                      height: 35,
+                    ),
                   ],
                 ),
 
                 const SizedBox(height: 40),
 
-                const Text("Welcome",
-                    style:
-                        TextStyle(fontSize: 28, fontWeight: FontWeight.w500)),
+                const Text(
+                  "Welcome",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
 
                 const Text("to Campus MarketPlace"),
 
                 const SizedBox(height: 40),
 
                 // EMAIL
-                _buildField(emailController, "Email", Icons.email),
+                _buildField(
+                  emailController,
+                  "Email",
+                  Icons.email,
+                  false,
+                ),
 
                 // PASSWORD
-                _buildField(passwordController, "Password", Icons.lock, true),
+                _buildField(
+                  passwordController,
+                  "Password",
+                  Icons.lock,
+                  true,
+                ),
 
-                const SizedBox(height: 40),
+                // FORGOT PASSWORD
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: forgotPassword,
+                    child: const Text(
+                      "Forgot Password?",
+                      style: TextStyle(
+                        color: Color(0xFF800020),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
 
-                // 🔐 LOGIN BUTTON
+                const SizedBox(height: 25),
+
+                // LOGIN BUTTON
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -135,9 +225,13 @@ class _LoginState extends State<Login> {
                       ),
                     ),
                     child: isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("Log In",
-                            style: TextStyle(color: Colors.white)),
+                        ? const CircularProgressIndicator(
+                            color: Colors.white,
+                          )
+                        : const Text(
+                            "Log In",
+                            style: TextStyle(color: Colors.white),
+                          ),
                   ),
                 ),
 
@@ -150,8 +244,12 @@ class _LoginState extends State<Login> {
     );
   }
 
-  Widget _buildField(TextEditingController controller, String hint,
-      IconData icon, [bool isPassword = false]) {
+  Widget _buildField(
+    TextEditingController controller,
+    String hint,
+    IconData icon, [
+    bool isPassword = false,
+  ]) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -167,6 +265,9 @@ class _LoginState extends State<Login> {
             child: TextField(
               controller: controller,
               obscureText: isPassword,
+              keyboardType: isPassword
+                  ? TextInputType.text
+                  : TextInputType.emailAddress,
               decoration: InputDecoration(
                 hintText: hint,
                 border: InputBorder.none,
