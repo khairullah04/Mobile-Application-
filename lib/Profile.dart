@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Login.dart';
 import 'MyPosts.dart';
 import 'EditProfile.dart';
+import 'SoldItems.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -148,12 +149,6 @@ class _ProfileState extends State<Profile> {
                       const SizedBox(height: 40),
 
                       profileButton(
-                        icon: Icons.shopping_bag_outlined,
-                        title: "My Orders",
-                        onTap: () {},
-                      ),
-
-                      profileButton(
                         icon: Icons.inventory_2_outlined,
                         title: "My Posts",
                         onTap: () {
@@ -161,6 +156,19 @@ class _ProfileState extends State<Profile> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const MyPosts(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      profileButton(
+                        icon: Icons.history,
+                        title: "Sold Items",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SoldItems(),
                             ),
                           );
                         },

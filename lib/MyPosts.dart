@@ -29,9 +29,9 @@ class MyPosts extends StatelessWidget {
             )
           : StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('posts')
-                  .where('sellerEmail', isEqualTo: user.email)
-                  .snapshots(),
+                .collection('posts')
+                .where('sellerEmail', isEqualTo: user?.email)
+                .snapshots(),
 
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -56,7 +56,10 @@ class MyPosts extends StatelessWidget {
                   );
                 }
 
-                final posts = snapshot.data!.docs;
+                final posts = snapshot.data!.docs.where((post) {
+                  final data = post.data() as Map<String, dynamic>;
+                  return data['status'] != 'Sold';
+                }).toList();
 
                 if (posts.isEmpty) {
                   return const Center(

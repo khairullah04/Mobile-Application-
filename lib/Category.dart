@@ -11,9 +11,19 @@ import 'LifestyleList.dart';
 import 'MerchList.dart';
 import 'FreeGiftList.dart';
 import 'ChatList.dart';
+import 'PostDetails.dart';
 
-class Category extends StatelessWidget {
+class Category extends StatefulWidget {
   const Category({super.key});
+
+  @override
+  State<Category> createState() => _CategoryState();
+}
+
+class _CategoryState extends State<Category> {
+  final searchController = TextEditingController();
+
+  String searchText = '';
 
   @override
   Widget build(BuildContext context) {
@@ -96,25 +106,102 @@ class Category extends StatelessWidget {
 
               // FILTER BAR
               Container(
-                height: 45,
+                height: 50,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.tune),
-                    SizedBox(width: 10),
-                    Text(
-                      "Filter categories...",
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                  ],
+
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      searchText = value.toLowerCase();
+                    });
+                  },
+
+                  decoration: const InputDecoration(
+                    icon: Icon(Icons.search),
+                    hintText: "Search items...",
+                    border: InputBorder.none,
+                  ),
                 ),
               ),
 
               const SizedBox(height: 20),
+
+              if (searchText.isNotEmpty)
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('posts')
+                        .snapshots(),
+
+                    builder: (context, snapshot) {
+
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      final results = snapshot.data!.docs.where((doc) {
+
+                        final title =
+                            doc['title'].toString().toLowerCase();
+
+                        return title.contains(searchText);
+
+                      }).toList();
+
+                      if (results.isEmpty) {
+                        return const Center(
+                          child: Text("No items found"),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: results.length,
+
+                        itemBuilder: (context, index) {
+
+                          final item = results[index];
+
+                          return ListTile(
+                            leading: const Icon(Icons.shopping_bag),
+
+                            title: Text(item['title']),
+
+                            subtitle: Text(
+                              "RM ${item['price']}",
+                            ),
+
+                            onTap: () {
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PostDetails(
+                                    postId: item.id,
+                                    title: item['title'],
+                                    description: item['description'],
+                                    price: item['price'],
+                                    sellerEmail: item['sellerEmail'],
+                                    sellerName:
+                                        item['sellerName'] ?? 'Seller',
+                                    isOwner: false,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                )
+              else
 
               // CATEGORY GRID
               Expanded(
