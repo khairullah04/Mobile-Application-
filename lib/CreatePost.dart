@@ -1,5 +1,5 @@
 import 'dart:io';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -77,6 +77,25 @@ class _CreatePostState extends State<CreatePost> {
     Navigator.pop(context);
   }
 
+  // Builds an image preview that works on both Web and native (Windows/Android/iOS)
+  Widget _buildImagePreview(XFile xfile) {
+    if (kIsWeb) {
+      // On web, use Image.network with the object URL path
+      return Image.network(
+        xfile.path,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.broken_image, size: 40),
+      );
+    } else {
+      // On native platforms (Windows, Android, iOS), use Image.file
+      return Image.file(
+        File(xfile.path),
+        fit: BoxFit.cover,
+      );
+    }
+  }
+
   Widget buildImageBox(int index) {
     return GestureDetector(
       onTap: () => pickImage(index),
@@ -91,10 +110,7 @@ class _CreatePostState extends State<CreatePost> {
             ? const Icon(Icons.add, size: 40)
             : ClipRRect(
                 borderRadius: BorderRadius.circular(30),
-                child: Image.file(
-                  File(images[index]!.path),
-                  fit: BoxFit.cover,
-                ),
+                child: _buildImagePreview(images[index]!),
               ),
       ),
     );
