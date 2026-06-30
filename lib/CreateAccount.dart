@@ -17,17 +17,43 @@ class _CreateAccountState extends State<CreateAccount> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // ONLY THESE DOMAINS ARE ALLOWED TO SIGN UP
+  // Add more here if needed, e.g. 'utm.my' for staff accounts
+  final List<String> _allowedDomains = ['graduate.utm.my'];
 
   bool isLoading = false;
 
+  bool _isUtmEmail(String email) {
+    final normalized = email.trim().toLowerCase();
+
+    return _allowedDomains.any(
+      (domain) => normalized.endsWith('@$domain'),
+    );
+  }
+
   Future<void> signUp() async {
+    final email = _emailController.text.trim();
+
+    // 🎓 UTM-ONLY EMAIL CHECK
+    if (!_isUtmEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Only UTM email accounts (e.g. yourname@graduate.utm.my) can be used to sign up.",
+          ),
+          backgroundColor: Color(0xFF800020),
+        ),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
       // 🔐 Create user in Firebase Auth
       UserCredential userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text.trim(),
       );
 
@@ -37,7 +63,7 @@ class _CreateAccountState extends State<CreateAccount> {
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'name': _nameController.text.trim(),
         'username': _usernameController.text.trim(),
-        'email': _emailController.text.trim(),
+        'email': email,
       });
 
       // ✅ Go back to login page

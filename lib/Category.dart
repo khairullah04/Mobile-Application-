@@ -12,6 +12,7 @@ import 'MerchList.dart';
 import 'FreeGiftList.dart';
 import 'ChatList.dart';
 import 'PostDetails.dart';
+import 'NotificationsPage.dart';
 
 class Category extends StatefulWidget {
   const Category({super.key});
@@ -363,7 +364,7 @@ class _CategoryState extends State<Category> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ChatList(),
+                    builder: (_) => const NotificationsPage(),
                   ),
                 );
               },

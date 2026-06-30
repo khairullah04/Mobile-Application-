@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'NotificationsPage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -382,10 +383,20 @@ class Wishlist extends StatelessWidget {
               },
             ),
 
-            const Icon(
-              Icons.notifications_none,
-              color: Colors.white70,
-              size: 28,
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_none,
+                color: Colors.white70,
+                size: 28,
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsPage(),
+                  ),
+                );
+              },
             ),
 
             const Icon(

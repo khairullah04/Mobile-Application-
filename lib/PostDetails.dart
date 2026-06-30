@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -38,6 +39,7 @@ class _PostDetailsState extends State<PostDetails> {
   String postPrice = "";
   String postStatus = "Available";
   String sellerUid = "";
+  List<String> postImages = [];
 
   String safeEmailKey(String email) {
     return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
@@ -72,6 +74,7 @@ class _PostDetailsState extends State<PostDetails> {
         postPrice = data?['price'] ?? widget.price;
         postStatus = data?['status'] ?? 'Available';
         sellerUid = data?['sellerUid'] ?? '';
+        postImages = List<String>.from(data?['images'] ?? []);
       });
     }
   }
@@ -472,12 +475,34 @@ class _PostDetailsState extends State<PostDetails> {
               color: Colors.grey[300],
               child: Stack(
                 children: [
-                  const Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 100,
-                    ),
-                  ),
+                  postImages.isNotEmpty
+                      ? PageView.builder(
+                          itemCount: postImages.length,
+                          itemBuilder: (context, index) {
+                            try {
+                              final bytes = base64Decode(postImages[index]);
+                              return Image.memory(
+                                bytes,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Center(
+                                  child: Icon(Icons.broken_image, size: 80),
+                                ),
+                              );
+                            } catch (_) {
+                              return const Center(
+                                child: Icon(Icons.broken_image, size: 80),
+                              );
+                            }
+                          },
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.image,
+                            size: 100,
+                          ),
+                        ),
 
                   Positioned(
                     top: 10,

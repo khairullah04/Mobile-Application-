@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'CreateAccount.dart';
 import 'CreatePost.dart';
 import 'Wishlist.dart';
+import 'NotificationsPage.dart';
 
 
 void main() async {
@@ -22,6 +23,7 @@ void main() async {
       routes: {
         '/createpost': (context) => const CreatePost(),
         '/wishlist': (context) => const Wishlist(),
+        '/notifications': (context) => const NotificationsPage(),
       },
 
       home: HomePage(),

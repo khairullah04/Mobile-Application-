@@ -1,9 +1,11 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image/image.dart' as img;
 
 class CreatePost extends StatefulWidget {
   const CreatePost({super.key});
@@ -22,18 +24,71 @@ class _CreatePostState extends State<CreatePost> {
 
   int currentPage = 0;
 
+  bool isPublishing = false;
+
+  // Holds the picked file (for preview) alongside its already-compressed
+  // bytes (what actually gets uploaded), so we don't recompress on publish.
   final List<XFile?> images = [null, null, null, null];
+  final List<Uint8List?> compressedBytes = [null, null, null, null];
 
   final picker = ImagePicker();
+
+  // Max edge length (px) and JPEG quality used to keep each image's base64
+  // string small enough that 4 of them comfortably fit under Firestore's
+  // 1MB document limit.
+  static const int maxDimension = 800;
+  static const int jpegQuality = 60;
 
   Future pickImage(int index) async {
     final picked = await picker.pickImage(source: ImageSource.gallery);
 
-    if (picked != null) {
-      setState(() {
-        images[index] = picked;
-      });
+    if (picked == null) return;
+
+    final rawBytes = await picked.readAsBytes();
+    final resized = _compressImage(rawBytes);
+
+    if (resized == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't read that image, try another.")),
+      );
+      return;
     }
+
+    setState(() {
+      images[index] = picked;
+      compressedBytes[index] = resized;
+    });
+  }
+
+  // Decodes, downsizes to maxDimension on the longest side, and re-encodes
+  // as JPEG at jpegQuality. Returns null if decoding fails.
+  Uint8List? _compressImage(Uint8List rawBytes) {
+    final decoded = img.decodeImage(rawBytes);
+    if (decoded == null) return null;
+
+    img.Image resized = decoded;
+    if (decoded.width > maxDimension || decoded.height > maxDimension) {
+      resized = decoded.width >= decoded.height
+          ? img.copyResize(decoded, width: maxDimension)
+          : img.copyResize(decoded, height: maxDimension);
+    }
+
+    final jpg = img.encodeJpg(resized, quality: jpegQuality);
+    return Uint8List.fromList(jpg);
+  }
+
+  // Converts each compressed image to a base64 string for storage directly
+  // on the Firestore document. No Storage bucket needed.
+  List<String> buildBase64Images() {
+    final List<String> encoded = [];
+
+    for (final bytes in compressedBytes) {
+      if (bytes == null) continue;
+      encoded.add(base64Encode(bytes));
+    }
+
+    return encoded;
   }
 
   Future publishPost() async {
@@ -52,35 +107,79 @@ class _CreatePostState extends State<CreatePost> {
       return;
     }
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
+    final base64Images = buildBase64Images();
 
-    final sellerName = userDoc['name'] ?? 'Seller';
+    // Rough guard against exceeding Firestore's 1MB document cap. Base64
+    // inflates raw bytes by ~33%; this is a conservative early check rather
+    // than the exact limit.
+    final totalChars = base64Images.fold<int>(0, (sum, s) => sum + s.length);
+    if (totalChars > 700000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Photos are too large even after compression. Try fewer photos.",
+          ),
+        ),
+      );
+      return;
+    }
 
-    await FirebaseFirestore.instance.collection('posts').add({
-      'title': titleController.text.trim(),
-      'description': descController.text.trim(),
-      'price': priceController.text.trim(),
-      'category': selectedCategory,
-      'type': selectedType,
-      'sellerUid': user.uid,
-      'sellerEmail': user.email,
-      'sellerName': sellerName,
-      'status': 'Available',
-      'createdAt': Timestamp.now(),
+    setState(() {
+      isPublishing = true;
     });
 
-    if (!mounted) return;
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
-    Navigator.pop(context);
+      final sellerName = userDoc['name'] ?? 'Seller';
+
+      await FirebaseFirestore.instance.collection('posts').add({
+        'title': titleController.text.trim(),
+        'description': descController.text.trim(),
+        'price': priceController.text.trim(),
+        'category': selectedCategory,
+        'type': selectedType,
+        'sellerUid': user.uid,
+        'sellerEmail': user.email,
+        'sellerName': sellerName,
+        'status': 'Available',
+        'createdAt': Timestamp.now(),
+        // Base64-encoded JPEG strings, stored directly on the document.
+        'images': base64Images,
+      });
+
+      if (!mounted) return;
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to publish post: $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isPublishing = false;
+        });
+      }
+    }
   }
 
-  // Builds an image preview that works on both Web and native (Windows/Android/iOS)
-  Widget _buildImagePreview(XFile xfile) {
+  // Builds an image preview that works on both Web and native (Windows/Android/iOS).
+  // Uses the already-compressed bytes so the preview matches what gets uploaded.
+  Widget _buildImagePreview(int index) {
+    final bytes = compressedBytes[index];
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    // Fallback to the raw picked file if compression hasn't completed yet.
+    final xfile = images[index]!;
     if (kIsWeb) {
-      // On web, use Image.network with the object URL path
       return Image.network(
         xfile.path,
         fit: BoxFit.cover,
@@ -88,10 +187,14 @@ class _CreatePostState extends State<CreatePost> {
             const Icon(Icons.broken_image, size: 40),
       );
     } else {
-      // On native platforms (Windows, Android, iOS), use Image.file
-      return Image.file(
-        File(xfile.path),
-        fit: BoxFit.cover,
+      return FutureBuilder<Uint8List>(
+        future: xfile.readAsBytes(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Image.memory(snapshot.data!, fit: BoxFit.cover);
+        },
       );
     }
   }
@@ -110,7 +213,7 @@ class _CreatePostState extends State<CreatePost> {
             ? const Icon(Icons.add, size: 40)
             : ClipRRect(
                 borderRadius: BorderRadius.circular(30),
-                child: _buildImagePreview(images[index]!),
+                child: _buildImagePreview(index),
               ),
       ),
     );
@@ -349,17 +452,26 @@ class _CreatePostState extends State<CreatePost> {
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton(
-                        onPressed: publishPost,
+                        onPressed: isPublishing ? null : publishPost,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF800020),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
                         ),
-                        child: const Text(
-                          "Publish",
-                          style: TextStyle(color: Colors.white),
-                        ),
+                        child: isPublishing
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                "Publish",
+                                style: TextStyle(color: Colors.white),
+                              ),
                       ),
                     ),
                   ],

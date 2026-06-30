@@ -1,28 +1,37 @@
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 
 import 'ChatRoom.dart';
+import 'ChatList.dart';
 import 'Category.dart';
-import 'NotificationsPage.dart';
 
-class ChatList extends StatelessWidget {
-  const ChatList({super.key});
+// NOTIFICATIONS PAGE
+//
+// Built on top of the existing `chats` collection (same data the bell's
+// red-dot badge already reads from `unreadCounts`). Each chat with an
+// unread message becomes a notification entry. Opening a notification
+// pushes the matching ChatRoom, which already resets `unreadCounts` for
+// the current user, so the notification clears itself automatically.
+class NotificationsPage extends StatelessWidget {
+  const NotificationsPage({super.key});
 
   String safeEmailKey(String email) {
     return email.replaceAll('.', '_dot_').replaceAll('@', '_at_');
   }
 
-  String getChatPreview(String lastMessage) {
-    if (lastMessage.trim().isEmpty) {
-      return "No messages yet";
-    }
+  String timeAgo(Timestamp? timestamp) {
+    if (timestamp == null) return '';
 
-    if (lastMessage.startsWith("I'm interested in this item:")) {
-      return "🛍️ Item reference sent";
-    }
+    final diff = DateTime.now().difference(timestamp.toDate());
 
-    return lastMessage;
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+
+    final date = timestamp.toDate();
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
@@ -37,7 +46,7 @@ class ChatList extends StatelessWidget {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          "Chats",
+          "Notifications",
           style: TextStyle(color: Colors.white),
         ),
       ),
@@ -51,7 +60,6 @@ class ChatList extends StatelessWidget {
                   .collection('chats')
                   .where('users', arrayContains: user.email)
                   .snapshots(),
-
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -75,15 +83,15 @@ class ChatList extends StatelessWidget {
                   );
                 }
 
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: Text("No data found"),
-                  );
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _EmptyState();
                 }
 
-                final chats = snapshot.data!.docs.toList();
+                final currentUserKey = safeEmailKey(user.email!);
 
-                chats.sort((a, b) {
+                final docs = snapshot.data!.docs.toList();
+
+                docs.sort((a, b) {
                   final aData = a.data() as Map<String, dynamic>;
                   final bData = b.data() as Map<String, dynamic>;
 
@@ -97,26 +105,20 @@ class ChatList extends StatelessWidget {
                   return 0;
                 });
 
-                if (chats.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      "No chats yet",
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  );
+                if (docs.isEmpty) {
+                  return _EmptyState();
                 }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: chats.length,
+                  itemCount: docs.length,
                   itemBuilder: (context, index) {
-                    final chat = chats[index];
-                    final chatData = chat.data() as Map<String, dynamic>;
+                    final doc = docs[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
-                    final users = List<String>.from(chatData['users'] ?? []);
-
+                    final users = List<String>.from(data['users'] ?? []);
                     final userNames = Map<String, dynamic>.from(
-                      chatData['userNames'] ?? {},
+                      data['userNames'] ?? {},
                     );
 
                     final otherEmail = users.firstWhere(
@@ -126,25 +128,25 @@ class ChatList extends StatelessWidget {
 
                     final otherName = userNames[otherEmail] ?? otherEmail;
 
-                    final lastMessage = chatData['lastMessage'] ?? "";
-                    final previewText = getChatPreview(lastMessage);
+                    final lastMessage = (data['lastMessage'] ?? '').toString();
 
                     final unreadCounts = Map<String, dynamic>.from(
-                      chatData['unreadCounts'] ?? {},
+                      data['unreadCounts'] ?? {},
                     );
 
-                    final currentUserKey = safeEmailKey(user.email!);
-
-                    final unreadCountRaw = unreadCounts[currentUserKey] ?? 0;
-
-                    final int unreadCount = unreadCountRaw is int
-                        ? unreadCountRaw
-                        : int.tryParse(unreadCountRaw.toString()) ?? 0;
+                    final unreadRaw = unreadCounts[currentUserKey] ?? 0;
+                    final int unreadCount = unreadRaw is int
+                        ? unreadRaw
+                        : int.tryParse(unreadRaw.toString()) ?? 0;
 
                     final bool hasUnread = unreadCount > 0;
 
+                    final lastMessageTime =
+                        data['lastMessageTime'] as Timestamp?;
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
+                      color: hasUnread ? const Color(0xFFFBEAEE) : Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
@@ -154,55 +156,54 @@ class ChatList extends StatelessWidget {
                               ? const Color(0xFF800020)
                               : Colors.grey[400],
                           child: const Icon(
-                            Icons.person,
+                            Icons.notifications,
                             color: Colors.white,
                           ),
                         ),
-
                         title: Text(
-                          otherName,
+                          hasUnread
+                              ? "New message from $otherName"
+                              : otherName,
                           style: TextStyle(
-                            fontWeight: hasUnread
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            fontWeight:
+                                hasUnread ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
-
                         subtitle: Text(
-                          previewText,
+                          lastMessage.isEmpty ? "No messages yet" : lastMessage,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: hasUnread
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: previewText.contains("Item reference")
-                                ? const Color(0xFF800020)
-                                : Colors.grey[700],
-                          ),
                         ),
-
-                        trailing: hasUnread
-                            ? CircleAvatar(
-                                radius: 13,
-                                backgroundColor: Colors.red,
-                                child: Text(
-                                  unreadCount.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              timeAgo(lastMessageTime),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            if (hasUnread) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
                                 ),
-                              )
-                            : null,
-
+                              ),
+                            ],
+                          ],
+                        ),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => ChatRoom(
-                                chatRoomId: chat.id,
+                                chatRoomId: doc.id,
                                 otherUserEmail: otherEmail,
                                 otherUserName: otherName,
                               ),
@@ -225,16 +226,10 @@ class ChatList extends StatelessWidget {
             topRight: Radius.circular(20),
           ),
         ),
-
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             IconButton(
-              icon: const Icon(
-                Icons.home_outlined,
-                color: Colors.white70,
-                size: 30,
-              ),
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
@@ -243,53 +238,86 @@ class ChatList extends StatelessWidget {
                   ),
                 );
               },
+              icon: const Icon(
+                Icons.home_outlined,
+                color: Colors.white70,
+                size: 30,
+              ),
             ),
 
             IconButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/wishlist');
+              },
               icon: const Icon(
                 Icons.favorite_border,
                 color: Colors.white70,
                 size: 28,
               ),
-              onPressed: () {
-                Navigator.pushNamed(context, '/wishlist');
-              },
             ),
 
             IconButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/createpost');
+              },
               icon: const Icon(
                 Icons.add_circle_outline,
                 color: Colors.white70,
                 size: 32,
               ),
-              onPressed: () {
-                Navigator.pushNamed(context, '/createpost');
-              },
+            ),
+
+            // CURRENT PAGE - BELL STAYS HIGHLIGHTED, NOT TAPPABLE
+            const Icon(
+              Icons.notifications,
+              color: Colors.white,
+              size: 28,
             ),
 
             IconButton(
-              icon: const Icon(
-                Icons.notifications_none,
-                color: Colors.white70,
-                size: 28,
-              ),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const NotificationsPage(),
+                    builder: (_) => const ChatList(),
                   ),
                 );
               },
-            ),
-
-            const Icon(
-              Icons.chat_bubble,
-              color: Colors.white,
-              size: 30,
+              icon: const Icon(
+                Icons.chat_bubble_outline,
+                color: Colors.white70,
+                size: 28,
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// EMPTY STATE WHEN THERE ARE NO NOTIFICATIONS
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.notifications_none,
+            size: 60,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "No notifications yet",
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
       ),
     );
   }
