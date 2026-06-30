@@ -6,6 +6,7 @@ import 'Login.dart';
 import 'MyPosts.dart';
 import 'EditProfile.dart';
 import 'SoldItems.dart';
+import 'ReportPage.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -169,6 +170,19 @@ class _ProfileState extends State<Profile> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const SoldItems(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      profileButton(
+                        icon: Icons.description_outlined,
+                        title: "Download Report",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReportPage(),
                             ),
                           );
                         },
